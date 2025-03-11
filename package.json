@@ -1,0 +1,26 @@
+{
+  "name": "info2602a1",
+  "version": "1.3.0",
+  "description": "INFO 2602 Assignment 1",
+  "main": "index.js",
+  "scripts": {
+    "api-test": "npm run newman && npm run newman >> reports/api-report.txt",
+    "test": "newman run collection.json -e environment.json; return 0;",
+    "update-tests": "curl -L -o collection.json https://www.getpostman.com/collections/583570-b1c26430-4a62-4a99-ab10-4fb6f81c5622"
+
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uwidcit/info2602a1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/uwidcit/info2602a1/issues"
+  },
+  "homepage": "https://github.com/uwidcit/info2602a1#readme",
+  "dependencies": {
+    "newman": "^5.3.2"
+  }
+}
