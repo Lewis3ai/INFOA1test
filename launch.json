@@ -1,0 +1,32 @@
+{
+    "configurations": [
+      {
+        "type": "debugpy",
+        "request": "launch",
+        "name": "Launch Flask App",
+        "program": "${workspaceFolder}/${input:programPath}",
+        "env": {
+          "FLASK_APP": "${workspaceFolder}/${input:programPath}",
+          "FLASK_ENV": "development"
+        },
+        "args": [
+          "run"
+        ],
+        "jinja": true,
+        "justMyCode": true,
+        "autoReload": true,
+        "console": "integratedTerminal"
+      }
+    ],
+    "inputs": [
+      {
+        "type": "pickString",
+        "id": "programPath",
+        "description": "Select the main file of your Flask application",
+        "options": [
+          "app.py",
+          "wsgi.py"
+        ]
+      }
+    ]
+}
