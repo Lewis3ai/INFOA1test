@@ -17,8 +17,7 @@ class UserPokemon(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     pokemon_id = db.Column(db.Integer, db.ForeignKey('pokemon.id'), nullable=False)
     name = db.Column(db.String(50), nullable=False)
-    
-    user = db.relationship('User', backref=db.backref('user_pokemon', lazy=True))
+
     pokemon = db.relationship('Pokemon', backref=db.backref('user_pokemon', lazy=True))
 
     def __init__(self, user_id, pokemon_id, name):

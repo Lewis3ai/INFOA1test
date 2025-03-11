@@ -1,169 +1,118 @@
-import click, sys, csv
+import click
+import csv
 from tabulate import tabulate
-from models import db, Todo, Admin, RegularUser, db, User
+from App import db, User, Pokemon, UserPokemon
+from App import app, initialize_db
 from sqlalchemy.exc import IntegrityError
-from app import app
-
-db.init_app(app)
-
 
 @app.cli.command("init", help="Creates and initializes the database")
 def initialize():
-  db.drop_all()
-  db.create_all()
-  bob = RegularUser('bob', 'bob@mail.com', 'bobpass')
-  rick = RegularUser('rick', 'rick@mail.com', 'rickpass')
-  sally = RegularUser('sally', 'sally@mail.com', 'sallypass')
-  pam = Admin('1123', 'pam', 'pam@mail.com', 'pampass')
-  db.session.add_all([bob, rick,
-                      sally, pam])  #add all can save multiple objects at once
-  db.session.commit()
-  #load todo data from csv file
-  with open('todos.csv') as file:
-    reader = csv.DictReader(file)
-    for row in reader:
-      new_todo = Todo(text=row['text'])  #create object
-      #update fields based on records
-      new_todo.done = True if row['done'] == 'true' else False
-      new_todo.user_id = int(row['user_id'])
-      db.session.add(new_todo)  #queue changes for saving
-    db.session.commit()
-    #save all changes OUTSIDE the loop
-  print('database intialized')
+  initialize_db()
+  print("Database Initialized!")
+
+
 
 
 @app.cli.command("get-user", help="Retrieves a User by username or id")
 @click.argument('key', default='bob')
 def get_user(key):
-  bob = RegularUser.query.filter_by(username=key).first()
-  if not bob:
-    bob = RegularUser.query.get(int(key))
-    if not bob:
-      print(f'{key} not found!')
-      return
-  print(bob)
-
+    user = User.query.filter_by(username=key).first()
+    if not user:
+        user = User.query.get(int(key))
+        if not user:
+            print(f'{key} not found!')
+            return
+    print(user)
 
 @app.cli.command("change-email")
-@click.argument('username', default='bob')
-@click.argument('email', default='bob@mail.com')
+@click.argument('username')
+@click.argument('email')
 def change_email(username, email):
-  bob = RegularUser.query.filter_by(username=username).first()
-  if not bob:
-    print(f'{username} not found!')
-    return
-  bob.email = email
-  db.session.add(bob)
-  db.session.commit()
-  print(bob)
-
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f'{username} not found!')
+        return
+    user.email = email
+    db.session.commit()
+    print(user)
 
 @app.cli.command('get-users')
 def get_users():
-  users = User.query.all()
-  print(users)
-
+    users = User.query.all()
+    print(users)
 
 @app.cli.command('create-user')
-@click.argument('username', default='rick')
-@click.argument('email', default='rick@mail.com')
-@click.argument('password', default='rickpass')
+@click.argument('username')
+@click.argument('email')
+@click.argument('password')
 def create_user(username, email, password):
-  newuser = RegularUser(username, email, password)
-  try:
-    db.session.add(newuser)
-    db.session.commit()
-  except IntegrityError as e:
-    db.session.rollback()
-    print(e.orig)
-    print("Username or email already taken!")
-  else:
-    print(newuser)
-
+    new_user = User(username, email, password)
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        print("Username or email already taken!")
+    else:
+        print(new_user)
 
 @app.cli.command('delete-user')
-@click.argument('username', default='bob')
+@click.argument('username')
 def delete_user(username):
-  bob = RegularUser.query.filter_by(username=username).first()
-  if not bob:
-    print(f'{username} not found!')
-    return
-  db.session.delete(bob)
-  db.session.commit()
-  print(f'{username} deleted')
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f'{username} not found!')
+        return
+    db.session.delete(user)
+    db.session.commit()
+    print(f'{username} deleted')
 
+@app.cli.command('add-pokemon')
+@click.argument('username')
+@click.argument('pokemon_id', type=int)
+def add_pokemon(username, pokemon_id):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f'{username} not found!')
+        return
+    pokemon = Pokemon.query.get(pokemon_id)
+    if not pokemon:
+        print(f'Pokemon ID {pokemon_id} not found!')
+        return
 
-@app.cli.command('add-todo')
-@click.argument('username', default='bob')
-@click.argument('text', default='wash car')
-def add_task(username, text):
-  bob = RegularUser.query.filter_by(username=username).first()
-  if not bob:
-    print(f'{username} not found!')
-    return
-  new_todo = Todo(text)
-  bob.todos.append(new_todo)
-  db.session.add(bob)
-  db.session.commit()
-  print('Todo added!')
+    user_pokemon = UserPokemon(user_id=user.id, pokemon_id=pokemon.id, name=pokemon.name)
+    db.session.add(user_pokemon)
+    db.session.commit()
+    print(f'Pokemon {pokemon.name} added to {username}!')
 
+@app.cli.command('get-user-pokemon')
+@click.argument('username')
+def get_user_pokemon(username):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f'{username} not found!')
+        return
+    user_pokemon = UserPokemon.query.filter_by(user_id=user.id).all()
+    print([f'Pokemon ID {up.pokemon_id}' for up in user_pokemon])
 
-@app.cli.command('get-todos')
-@click.argument('username', default='bob')
-def get_user_todos(username):
-  bob = RegularUser.query.filter_by(username=username).first()
-  if not bob:
-    print(f'{username} not found!')
-    return
-  print(bob.todos)
+@app.cli.command('remove-pokemon')
+@click.argument('username')
+@click.argument('pokemon_id', type=int)
+def remove_pokemon(username, pokemon_id):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f'{username} not found!')
+        return
+    user_pokemon = UserPokemon.query.filter_by(user_id=user.id, pokemon_id=pokemon_id).first()
+    if not user_pokemon:
+        print(f'Pokemon ID {pokemon_id} not found for {username}!')
+        return
+    db.session.delete(user_pokemon)
+    db.session.commit()
+    print(f'Pokemon ID {pokemon_id} removed from {username}!')
 
-
-@click.argument('todo_id', default=1)
-@click.argument('username', default='bob')
-@app.cli.command('toggle-todo')
-def toggle_todo_command(todo_id, username):
-  user = RegularUser.query.filter_by(username=username).first()
-  if not user:
-    print(f'{username} not found!')
-    return
-
-  todo = Todo.query.filter_by(id=todo_id, user_id=user.id).first()
-  if not todo:
-    print(f'{username} has no todo id {todo_id}')
-
-  todo.toggle()
-  print(f'{todo.text} is {"done" if todo.done else "not done"}!')
-
-
-@click.argument('category', default='chores')
-@click.argument('username', default='bob')
-@click.argument('todo_id', default=1)
-@app.cli.command('add-category', help="Adds a category to a todo")
-def add_todo_category_command(
-    category,
-    todo_id,
-    username,
-):
-  user = User.query.filter_by(username=username).first()
-  if not user:
-    print(f'user {username} not found!')
-    return
-
-  res = user.add_todo_category(todo_id, category)
-  if not res:
-    print(f'{username} has no todo id {todo_id}')
-    return
-
-  todo = Todo.query.get(todo_id)
-  print(todo)
-
-
-@app.cli.command('list-todos')
-def list_todos():
-  #tabulate package needs to work with an array of arrays
-  data = []
-  for todo in Todo.query.all():
-    data.append(
-        [todo.text, todo.done, todo.user.username,
-         todo.get_cat_list()])
-  print(tabulate(data, headers=["Text", "Done", "User", "Categories"]))
+@app.cli.command('list-pokemon')
+def list_pokemon():
+    pokemon_list = Pokemon.query.all()
+    data = [[p.id, p.name, p.type, p.description] for p in pokemon_list]
+    print(tabulate(data, headers=["ID", "Name", "Type", "Description"]))
