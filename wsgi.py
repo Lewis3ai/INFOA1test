@@ -1,28 +1,42 @@
-import click, sys
-from models import db, User, Todo
+import click, sys, csv
+from tabulate import tabulate
+from models import db, Todo, Admin, RegularUser, db, User
 from sqlalchemy.exc import IntegrityError
 from app import app
+
+db.init_app(app)
 
 
 @app.cli.command("init", help="Creates and initializes the database")
 def initialize():
   db.drop_all()
-  db.init_app(app)
   db.create_all()
-  bob = User('bob', 'bob@mail.com', 'bobpass')
-  bob.todos.append(Todo('wash car'))
-  db.session.add(bob)
+ 
+  bob = RegularUser('bob', 'bob@mail.com', 'bobpass')
+  rick = RegularUser('rick', 'rick@mail.com', 'rickpass')
+  sally = RegularUser('sally', 'sally@mail.com', 'sallypass')
+  db.session.add_all([bob, rick, sally])  #add all can save multiple objects at once
   db.session.commit()
-  print(bob)
+  #load todo data from csv file
+  with open('todos.csv') as file:
+    reader = csv.DictReader(file)
+    for row in reader:
+      new_todo = Todo(text=row['text'])  #create object
+      #update fields based on records
+      new_todo.done = True if row['done'] == 'true' else False
+      new_todo.user_id = int(row['user_id'])
+      db.session.add(new_todo)  #queue changes for saving
+    db.session.commit()
+    #save all changes OUTSIDE the loop
   print('database intialized')
 
 
 @app.cli.command("get-user", help="Retrieves a User by username or id")
 @click.argument('key', default='bob')
 def get_user(key):
-  bob = User.query.filter_by(username=key).first()
+  bob = RegularUser.query.filter_by(username=key).first()
   if not bob:
-    bob = User.query.get(int(key))
+    bob = RegularUser.query.get(int(key))
     if not bob:
       print(f'{key} not found!')
       return
@@ -33,7 +47,7 @@ def get_user(key):
 @click.argument('username', default='bob')
 @click.argument('email', default='bob@mail.com')
 def change_email(username, email):
-  bob = User.query.filter_by(username=username).first()
+  bob = RegularUser.query.filter_by(username=username).first()
   if not bob:
     print(f'{username} not found!')
     return
@@ -54,7 +68,7 @@ def get_users():
 @click.argument('email', default='rick@mail.com')
 @click.argument('password', default='rickpass')
 def create_user(username, email, password):
-  newuser = User(username, email, password)
+  newuser = RegularUser(username, email, password)
   try:
     db.session.add(newuser)
     db.session.commit()
@@ -69,7 +83,7 @@ def create_user(username, email, password):
 @app.cli.command('delete-user')
 @click.argument('username', default='bob')
 def delete_user(username):
-  bob = User.query.filter_by(username=username).first()
+  bob = RegularUser.query.filter_by(username=username).first()
   if not bob:
     print(f'{username} not found!')
     return
@@ -82,7 +96,7 @@ def delete_user(username):
 @click.argument('username', default='bob')
 @click.argument('text', default='wash car')
 def add_task(username, text):
-  bob = User.query.filter_by(username=username).first()
+  bob = RegularUser.query.filter_by(username=username).first()
   if not bob:
     print(f'{username} not found!')
     return
@@ -96,7 +110,7 @@ def add_task(username, text):
 @app.cli.command('get-todos')
 @click.argument('username', default='bob')
 def get_user_todos(username):
-  bob = User.query.filter_by(username=username).first()
+  bob = RegularUser.query.filter_by(username=username).first()
   if not bob:
     print(f'{username} not found!')
     return
@@ -107,7 +121,7 @@ def get_user_todos(username):
 @click.argument('username', default='bob')
 @app.cli.command('toggle-todo')
 def toggle_todo_command(todo_id, username):
-  user = User.query.filter_by(username=username).first()
+  user = RegularUser.query.filter_by(username=username).first()
   if not user:
     print(f'{username} not found!')
     return
@@ -119,11 +133,16 @@ def toggle_todo_command(todo_id, username):
   todo.toggle()
   print(f'{todo.text} is {"done" if todo.done else "not done"}!')
 
+
 @click.argument('category', default='chores')
 @click.argument('username', default='bob')
 @click.argument('todo_id', default=1)
 @app.cli.command('add-category', help="Adds a category to a todo")
-def add_todo_category_command(category, todo_id, username,):
+def add_todo_category_command(
+    category,
+    todo_id,
+    username,
+):
   user = User.query.filter_by(username=username).first()
   if not user:
     print(f'user {username} not found!')
@@ -136,3 +155,14 @@ def add_todo_category_command(category, todo_id, username,):
 
   todo = Todo.query.get(todo_id)
   print(todo)
+
+
+@app.cli.command('list-todos')
+def list_todos():
+  #tabulate package needs to work with an array of arrays
+  data = []
+  for todo in Todo.query.all():
+    data.append(
+        [todo.text, todo.done, todo.user.username,
+         todo.get_cat_list()])
+  print(tabulate(data, headers=["Text", "Done", "User", "Categories"]))
